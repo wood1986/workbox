@@ -106,9 +106,17 @@ class InjectManifest {
     importScriptsArray.push((compilation.options.output.publicPath || '') +
       pathToManifestFile.split(path.sep).join('/'));
 
+    let workboxSWImport = '';
     // workboxSWImports might be null if importWorkboxFrom is 'disabled'.
     if (workboxSWImports) {
-      importScriptsArray.push(...workboxSWImports);
+      if (workboxSWImports.length === 1 && this.config.includeSW) {
+        workboxSWImport = await readFileWrapper(
+            readFile,
+            require.resolve('workbox-sw')
+        );
+      } else {
+        importScriptsArray.push(...workboxSWImports);
+      }
     }
 
     let originalSWString;
@@ -134,16 +142,21 @@ class InjectManifest {
       compilation.fileDependencies.add(absoluteSwSrc);
     }
 
-    const importScriptsString = importScriptsArray
-        .map(JSON.stringify)
-        .join(', ');
+    const importScriptsString = importScriptsArray.length ?
+      `importScripts(${importScriptsArray
+          .map(JSON.stringify)
+          .join(', ')});` :
+      '';
+
 
     const setConfigString = modulePathPrefix
       ? `workbox.setConfig({modulePathPrefix: ` +
         `${JSON.stringify(modulePathPrefix)}});`
       : '';
 
-    const postInjectionSWString = `importScripts(${importScriptsString});
+    const postInjectionSWString = `
+${workboxSWImport}
+${importScriptsString}
 ${setConfigString}
 ${originalSWString}
 `;

@@ -22,7 +22,11 @@ module.exports = `/**
  */
 
 <% if (workboxSWImport) { %>
+  <% if (includeSW) { %>
+<%= workboxSWImport %>
+  <% } else { %>
 importScripts(<%= JSON.stringify(workboxSWImport) %>);
+  <% } %>
 <% if (modulePathPrefix) { %>workbox.setConfig({modulePathPrefix: <%= JSON.stringify(modulePathPrefix) %>});<% } %>
 <% } %>
 <% if (importScripts) { %>

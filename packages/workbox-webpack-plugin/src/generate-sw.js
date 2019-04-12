@@ -16,6 +16,7 @@ const getAssetHash = require('./lib/get-asset-hash');
 const getManifestEntriesFromCompilation =
   require('./lib/get-manifest-entries-from-compilation');
 const getWorkboxSWImports = require('./lib/get-workbox-sw-imports');
+const readFileWrapper = require('./lib/read-file-wrapper');
 const relativeToOutputPath = require('./lib/relative-to-output-path');
 const sanitizeConfig = require('./lib/sanitize-config');
 const stringifyManifest = require('./lib/stringify-manifest');
@@ -49,9 +50,11 @@ class GenerateSW {
 
   /**
    * @param {Object} compilation The webpack compilation.
+   * @param {Function} readFile The function to use when reading files,
+   * derived from compiler.inputFileSystem.
    * @private
    */
-  async handleEmit(compilation) {
+  async handleEmit(compilation, readFile) {
     const configWarning = warnAboutConfig(this.config);
     if (configWarning) {
       compilation.warnings.push(configWarning);
@@ -82,7 +85,9 @@ class GenerateSW {
         // When importWorkboxFrom is 'cdn' or 'local', or a chunk name
         // that only contains one JavaScript asset, then this will be a one
         // element array, containing just the Workbox SW code.
-        workboxSWImport = workboxSWImports[0];
+        workboxSWImport = this.config.includeSW
+          ? await readFileWrapper(readFile, require.resolve('workbox-sw'))
+          : workboxSWImports[0];
       } else {
         // If importWorkboxFrom was a chunk name that contained multiple
         // JavaScript assets, then we don't know which contains the Workbox SW
@@ -97,6 +102,7 @@ class GenerateSW {
     sanitizedConfig.globPatterns = sanitizedConfig.globPatterns || [];
     sanitizedConfig.importScripts = importScriptsArray;
     sanitizedConfig.workboxSWImport = workboxSWImport;
+    sanitizedConfig.includeSW = this.config.includeSW;
     const {swString, warnings} = await generateSWString(sanitizedConfig);
     compilation.warnings = compilation.warnings.concat(warnings || []);
 
@@ -110,16 +116,18 @@ class GenerateSW {
    * @private
    */
   apply(compiler) {
+    const readFile = compiler.inputFileSystem.readFile
+        .bind(compiler.inputFileSystem);
     if ('hooks' in compiler) {
       // We're in webpack 4+.
       compiler.hooks.emit.tapPromise(
           this.constructor.name,
-          (compilation) => this.handleEmit(compilation)
+          (compilation) => this.handleEmit(compilation, readFile)
       );
     } else {
       // We're in webpack 2 or 3.
       compiler.plugin('emit', (compilation, callback) => {
-        this.handleEmit(compilation)
+        this.handleEmit(compilation, readFile)
             .then(callback)
             .catch(callback);
       });

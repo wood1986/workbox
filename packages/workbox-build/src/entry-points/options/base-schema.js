@@ -18,6 +18,7 @@ module.exports = joi.object().keys({
   globIgnores: joi.array().items(joi.string()).default(defaults.globIgnores),
   globPatterns: joi.array().items(joi.string()).default(defaults.globPatterns),
   globStrict: joi.boolean().default(defaults.globStrict),
+  includeSW: joi.boolean().default(defaults.includeSW),
   manifestTransforms: joi.array().items(joi.func().arity(1)),
   maximumFileSizeToCacheInBytes: joi.number().min(1)
       .default(defaults.maximumFileSizeToCacheInBytes),
